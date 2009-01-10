@@ -1,4 +1,21 @@
 #!/usr/bin/env python2.5
+#
+# ankimaemi - (c) 2009 Stefan Sayer
+# based on ankimini by Damien Elmes
+#
+# see http://ichi2.net/anki/ and http://anki.garage.maemo.org 
+#
+# License: GPLv3
+
+appname = "ankimaemi"
+appversion = "0.0.3"
+
+import os
+os.environ["SDL_VIDEO_X11_WMCLASS"]=appname
+import osso
+
+osso_c = osso.Context(appname, appversion, False)
+
 import gtkhtml2
 import gtk
 import hildon
@@ -9,19 +26,12 @@ from anki.sync import SyncClient, HttpSyncServerProxy
 from anki.media import mediaRefs
 from anki.utils import parseTags, joinTags
 
+from gnome import gconf 
+
 def request_object(*args):
     print 'request object', args
 
-global DECK_PATH, SYNC_USERNAME, SYNC_PASSWORD
-configFile = os.path.expanduser("~/.ankimini-config.py")
-try:
-    execfile(configFile)
-except:
-    dialog = gtk.MessageDialog(None,0, gtk.MESSAGE_ERROR, gtk.BUTTONS_OK, \
-                               "Can't read the config file %s. Did you install it?\n"%configFile)
-    dialog.run()
-    dialog.destroy()
-    raise
+gtk.set_application_name(appname)
 
 class AnkiMiniApp(hildon.Program):
 
@@ -29,20 +39,23 @@ class AnkiMiniApp(hildon.Program):
     deck = None
     played = False
 
-    DECK_PATH = DECK_PATH
-    SYNC_USERNAME = SYNC_USERNAME
-    SYNC_PASSWORD = SYNC_PASSWORD
+    conf_client = None
+
+    DECK_PATH = ""
+    SYNC_USERNAME = ""
+    SYNC_PASSWORD = ""
 
     def __init__(self):
         hildon.Program.__init__(self)
 
         self.window = hildon.Window()
-        self.window.connect("destroy", gtk.main_quit)
-        self.window.connect("delete_event", gtk.main_quit)
+        self.window.connect("destroy", self.quit_save)
+        self.window.connect("delete_event", self.quit_save)
         self.window.connect("key-press-event", self.on_key_press)
         self.window.connect("window-state-event", self.on_window_state_change)
         self.window_in_fullscreen = False 
-        
+        self.window.set_title("")
+
         self.add_window(self.window)
         self.mainbox = gtk.VBox(False, 0)
         self.window.add(self.mainbox)
@@ -76,7 +89,6 @@ class AnkiMiniApp(hildon.Program):
         self.savebutton.show()
         self.opbuttonsbox.pack_start(self.savebutton, True, True, 0)
 
-
         self.markbutton = gtk.Button()
         self.markbutton.connect("clicked", self.opbutclick, "mark")
         self.markbuttonlabel = gtk.Label("mark")
@@ -108,12 +120,9 @@ class AnkiMiniApp(hildon.Program):
 #    self.document.connect('request_url', request_url)
 #    self.document.connect('link_clicked', link_clicked)
 
-        self.document.clear()
-        self.document.open_stream('text/html')
-        self.document.write_stream('<html><head></head><body>question <b> is </b> this <br></body></html>')
-        self.document.close_stream()
         self.view = gtkhtml2.View()
-        self.view.set_document(self.document)
+        self.set_html_doc('<center><div class="a"><br/><br/><br/>%s %s<br/><br/>Welcome.</div></center>' % 
+                          (appname, appversion))
         self.view.connect('request_object', request_object)
         self.qabox.pack_start(self.view, True, True, 0)
         
@@ -150,55 +159,95 @@ class AnkiMiniApp(hildon.Program):
         self.mainbox.show()
 
         self.menu = gtk.Menu()
-        menu_item = gtk.MenuItem("Choose Deck...")
+        menu_item = gtk.MenuItem("Open...")
         menu_item.connect("activate", self.choose_deck, "choose_deck")
         menu_item.show()
 
         menuItemSave = gtk.MenuItem("Save")
         menuItemSave.connect("activate", self.opbutclick, "save")
+
+        menuItemClose = gtk.MenuItem("Close")
+        menuItemClose.connect("activate", self.opbutclick, "close")
+
+        menuItemSync = gtk.MenuItem("Sync")
+        menuItemSync.connect("activate", self.opbutclick, "sync")
+
+        menuItemSyncSettings = gtk.MenuItem("Sync account...")
+        menuItemSyncSettings.connect("activate", self.run_settings, "run_settings")
+
+        menuItemSeparator1 = gtk.SeparatorMenuItem()
         menuItemSeparator = gtk.SeparatorMenuItem()
 
         menuItemExit = gtk.MenuItem("Exit")
-        menuItemExit.connect("activate", gtk.main_quit, "quit")
+        menuItemExit.connect("activate", self.quit_save, "quit")
 
         self.menu.append(menu_item)
         self.menu.append(menuItemSave)
+        self.menu.append(menuItemSync)
+        self.menu.append(menuItemClose)
+        self.menu.append(menuItemSeparator)
+        self.menu.append(menuItemSyncSettings)
+        self.menu.append(menuItemSeparator1)
         self.menu.append(menuItemExit)
         self.window.set_menu(self.menu)
 
+    def set_window_empty(self):
+        self.opbuttonsbox.hide()
+        self.answerbuttonbox.hide()
+        self.resultbuttonbox.hide()
+
+        
     def init_deck(self):
         print "open deck.. " + self.DECK_PATH
         if not os.path.exists(self.DECK_PATH):
-            self.err_dlg("Couldn't open your deck. Please check config.")
-            return
+            self.err_dlg("Couldn't find your deck. Sorry.")
+            return False
+        try:
+            self.deck = ds.Deck(self.DECK_PATH, backup=False)
+            self.deck.rebuildQueue()
+        except:
+            self.err_dlg("Couldn't open your deck. Sorry.")
+            return False
+        return True
 
-        self.deck = ds.Deck(self.DECK_PATH, backup=False)
-        self.deck.rebuildQueue()
+    def yesno_dlg(self, dtype, msg):
+        dlg = gtk.MessageDialog(None,0, dtype, gtk.BUTTONS_YES_NO, msg)
+        rep = dlg.run()
+        return rep == gtk.RESPONSE_YES
 
     def choose_deck(self, widget, event):
+        if self.deck:
+            if self.deck.modifiedSinceSave() and self.yesno_dlg(gtk.MESSAGE_QUESTION, "Save the current deck first?"):
+                self.deck_save()                
+
+            self.deck.close()
         selector=hildon.FileChooserDialog(self.window,gtk.FILE_CHOOSER_ACTION_OPEN)
         rep=selector.run()
         selector.hide()
         a=selector.get_filename()
         if rep==gtk.RESPONSE_OK:
             self.DECK_PATH = a
-            self.init_deck()
-            self.set_question()
-            self.set_stats()
+            if (self.init_deck()):
+                self.set_question()
+                self.set_stats()
+                self.conf_client.set_string("/apps/anki/general/deck_path", self.DECK_PATH)
         selector.destroy()
 
     def run(self):
         self.window.show_all()
-        configFile = os.path.expanduser("~/.ankimini-config.py")
-        try:
-            execfile(configFile)
-        except:
-            self.err_dlg("Can't read the config file (%s). Did you install it?" % configFile)
-            raise
 
-        self.init_deck()
-        self.set_question()
-        self.set_stats()
+        self.conf_client = gconf.client_get_default()
+        self.conf_client.add_dir("/apps/anki/general", gconf.CLIENT_PRELOAD_NONE)
+        self.DECK_PATH = self.conf_client.get_string("/apps/anki/general/deck_path")
+        self.SYNC_USERNAME = self.conf_client.get_string("/apps/anki/general/sync_username")
+        self.SYNC_PASSWORD = self.conf_client.get_string("/apps/anki/general/sync_password")
+
+        if not self.DECK_PATH or self.DECK_PATH == "": 
+            self.set_window_empty()
+        else:
+            if self.init_deck():
+                self.set_question()
+                self.set_stats()
         gtk.main()
     
     def set_stats(self):
@@ -255,9 +304,16 @@ body { margin-top: 0px; padding: 0px; }
 """ % html_str)
         self.document.close_stream()
         self.view.set_document(self.document)
+
+    def print_html_doc(self, html_str):
+        self.set_html_doc(html_str)
+        while (gtk.events_pending()):
+            gtk.main_iteration()
+
     
     def set_question(self):
       # get new card
+        self.opbuttonsbox.show()
         c = self.deck.getCard(orm=False)
         if not c:
           # try once more after refreshing queue
@@ -290,6 +346,7 @@ body { margin-top: 0px; padding: 0px; }
             self.currentCard = deck.getCard(orm=False)
         c = self.currentCard
 
+        self.opbuttonsbox.show()
         self.answerbuttonbox.hide()
         self.resultbuttonbox.show()
         self.set_html_doc('<br/><br/><center><div class="q">%s</div> <br/><br/><div class="a"> %s </div></center>' % 
@@ -304,7 +361,7 @@ body { margin-top: 0px; padding: 0px; }
     def prepareMedia(self, string, auto=True):
         for (fullMatch, filename, replacementString) in mediaRefs(string):
             if fullMatch.startswith("["):
-                if filename.lower().endswith(".mp3") and auto:
+                if (filename.lower().endswith(".mp3") or filename.lower().endswith(".wav")) and auto:
                     subprocess.Popen(["mplayer",
                                       os.path.join(self.deck.mediaDir(), filename)])
                 string = re.sub(re.escape(fullMatch), "", string)
@@ -321,8 +378,12 @@ body { margin-top: 0px; padding: 0px; }
         dialog.destroy()
   
     def do_sync(self):
+        if self.SYNC_USERNAME == "" or self.SYNC_PASSWORD == "" and \
+            self.yesno_dlg(gtk.MESSAGE_QUESTION, "Do you want to set sync account?"):
+            self.run_settings(None, None)
+                    
+        self.deck_save()
         page = "<br/><br/>"
-        self.deck.save()
         self.deck.lastLoaded = time.time()
         #syncing
         while 1:
@@ -355,56 +416,64 @@ body { margin-top: 0px; padding: 0px; }
 </head><body>\n
 Fetching summary from server..<br>
 """
-            self.set_html_doc(page)
-            while (gtk.events_pending()):
-                gtk.main_iteration()
+            self.print_html_doc(page)
             sums = client.summaries()
                 # diff
-            page+="Determining differences..<br>"
-            self.set_html_doc(page)
-            while (gtk.events_pending()):
-                gtk.main_iteration()
+            page+="Determining differences.."
+            self.print_html_doc(page)
             payload = client.genPayload(sums)
                 # send payload
             pr = client.payloadChangeReport(payload)
             page+="<br>" + pr + "<br>"
             page+="Sending payload...<br>"
-            self.set_html_doc(page)
-            while (gtk.events_pending()):
-                gtk.main_iteration()
+            self.print_html_doc(page)
             res = client.server.applyPayload(payload)
                 # apply reply
             page+="Applying reply..<br>"
-            self.set_html_doc(page)
-            while (gtk.events_pending()):
-                gtk.main_iteration()
+            self.print_html_doc(page)
             client.applyPayloadReply(res)
                 # finished. save deck, preserving mod time
             page+="Sync complete."
-            self.set_html_doc(page)
-            while (gtk.events_pending()):
-                gtk.main_iteration()
+            self.print_html_doc(page)
             self.deck.rebuildQueue()
             self.deck.lastLoaded = self.deck.modified
             self.deck.s.flush()
             self.deck.s.commit()
         
-                              
+    def deck_save(self):
+        self.print_html_doc("<center><br/><br/>saving %s...</center>" % self.DECK_PATH)
+        self.deck.save()        
+
     def opbutclick(self, widget, cmd):
         if cmd == 'save':
-            self.set_html_doc("<center><br/><br/>saving %s...</center>" % DECK_PATH)
-            while (gtk.events_pending()):
-                gtk.main_iteration()
-            self.deck.save()
-            self.set_question()
-            self.set_stats()
+            if self.deck:
+                self.deck_save()
+                self.set_question()
+                self.set_stats()
         elif cmd == 'answer':
             self.set_q_a()
             self.set_stats()
+        elif cmd == 'close':
+            if self.deck.modifiedSinceSave() and \
+                    self.yesno_dlg(gtk.MESSAGE_QUESTION, "Save the current deck first?"):
+                self.deck_save()                
+            self.deck.close()
+            self.deck = None
+            self.opbuttonsbox.hide()
+            self.answerbuttonbox.hide()
+            self.resultbuttonbox.hide()
+            self.set_html_doc('<center><div class="a"><br/><br/><br/>%s %s</div></center>' % 
+                              (appname, appversion))
+            self.statslabel.set_markup("T: 0/0 (0.0%) A: <b>0.0%</b>. ETA: <b>Unknown</b>")
+            self.missinglabel.set_markup('<span foreground="red">0</span>+0+<span foreground="blue">0</span>')
+
         elif cmd == 'replay':
             self.prepareMedia(self.currentCard.question)
             self.prepareMedia(self.currentCard.answer)
         elif cmd == 'sync':
+            self.opbuttonsbox.hide()
+            self.answerbuttonbox.hide()
+            self.resultbuttonbox.hide()
             self.do_sync()
             self.set_question()
             self.set_stats()
@@ -426,6 +495,98 @@ Fetching summary from server..<br>
         self.answer(number)
         self.set_question()
         self.set_stats()
+
+    def quit_save(self, *args):
+        if self.deck and self.deck.modifiedSinceSave():
+            dialog = gtk.MessageDialog(None,0, gtk.MESSAGE_QUESTION, gtk.BUTTONS_YES_NO, 
+                                    "Save the current deck first?")
+            rep = dialog.run()
+            if rep == gtk.RESPONSE_YES:
+                self.deck_save()
+
+        if self.deck:
+            self.deck.close()
+
+        gtk.main_quit()
+        
+    # Commit changes to the GConf database. 
+    def config_entry_commit (self, entry, *args):
+        client = entry.get_data ('client')
+        text = entry.get_chars (0, -1)
+        
+        key = entry.get_data ('key')
+
+    # Unset if the string is zero-length, otherwise set
+        if text:
+            client.set_string (key, text)
+        else:
+            client.unset (key)
+
+    # From gconf-basic-app
+    # Create an entry used to edit the given config key 
+    def create_config_entry (self, prefs_dialog, client, label, config_key, focus=False):
+        hbox = gtk.HBox (False, 5)
+        label = gtk.Label (label)
+        entry = gtk.Entry ()
+
+        hbox.pack_start (label, False, False, 0)
+        hbox.pack_end (entry, False, False, 0)
+
+        # this will print an error via default error handler
+        # if the key isn't set to a string
+
+        s = client.get_string (config_key)
+        if s:
+            entry.set_text (s)
+  
+        entry.set_data ('client', client)
+        entry.set_data ('key', config_key)
+
+        # Commit changes if the user focuses out, or hits enter; we don't
+        # do this on "changed" since it'd probably be a bit too slow to
+        # round-trip to the server on every "changed" signal.
+
+        entry.connect ('focus_out_event', self.config_entry_commit)
+        entry.connect ('activate', self.config_entry_commit)    
+   
+        # Set the entry insensitive if the key it edits isn't writable.
+        # Technically, we should update this sensitivity if the key gets
+        # a change notify, but that's probably overkill.
+
+        entry.set_sensitive (client.key_is_writable (config_key))
+
+        if focus:
+            entry.grab_focus ()
+  
+        return hbox
+
+    def run_settings(self, widget, event):
+        dialog = gtk.Dialog ("Anki sync account",
+                             None,
+                             0,
+                             (gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT))
+
+    # destroy dialog on button press
+        dialog.connect ('response', lambda wid,ev: wid.destroy ())
+
+        dialog.set_default_response (gtk.RESPONSE_ACCEPT)
+
+        vbox = gtk.VBox (False, 5)
+        vbox.set_border_width (5)
+        
+        dialog.vbox.pack_start (vbox)
+
+        entry = self.create_config_entry (dialog, self.conf_client, "Username:", "/apps/anki/general/sync_username", True)
+        vbox.pack_start (entry, False, False)
+
+        entry = self.create_config_entry (dialog, self.conf_client, "Password:", "/apps/anki/general/sync_password")
+        vbox.pack_start (entry, False, False)
+
+        dialog.show_all()
+        dialog.run()
+        
+        self.SYNC_USERNAME = self.conf_client.get_string("/apps/anki/general/sync_username")
+        self.SYNC_PASSWORD = self.conf_client.get_string("/apps/anki/general/sync_password")
 
 app = AnkiMiniApp()
 app.run()
