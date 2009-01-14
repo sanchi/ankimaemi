@@ -1,14 +1,14 @@
 (S'ankimaemi'
-S'0.0.2'
+S'0.0.4'
 S'user/other'
 S'armel'
 S'Optional'
 S'Stefan Sayer <sayer@cs.tu-berlin.de>'
-S'anki (>=0.9.8.7), python-gtkhtml2'
-S"Ankimaemi: Maemo Anki for mobile SRS learning.\n\nAnki is a spaced repetition system (SRS). It helps you remember things by intelligently scheduling reviews, so that you can learn a lot of information with the minimum amount of effort.\n\nFeatures:\n\n    * Review anywhere. Anki lets you study on your own computer, online, on your cell phone or other portable devices like an iPod touch or Zaurus.\n    * Synchronization features let you keep your information across multiple computers.\n    * Shared decks allow you to divide work between friends, and let teachers push material to many students at once.\n    * Intelligent scheduler based on the SuperMemo SM2 algorithm.\n    * Flexible fact/card model that allows you to generate multiple views of information, and input information in the format you wish. You're not limited to predefined styles.\n    * Audio and images are fully supported\n    * Fully extensible, with a large number of plugins already available\n    * Optimized for speed, and will handle reviewing decks of 100,000+ cards with no problems\n    * Clean, user-friendly interface\n    * Free and Open Source"
+S'anki (>=0.9.8.7), python-gtkhtml2, python2.5-osso, python2.5-hildon, python2.5-gnome'
+S"Ankimaemi: Maemo Anki for mobile SRS learning.\n\nAnki is a spaced repetition system (SRS). It helps you remember things by intelligently scheduling reviews, so that you can learn a lot of information with the minimum amount of effort.\n\nFeatures:\n\n    * Review anywhere. Anki lets you study on your own computer, online, on your cell phone or other portable devices like an iPod touch or Zaurus.\n    * Synchronization features let you keep your information across multiple computers.\n    * Shared decks allow you to divide work between friends, and let teachers push material to many students at once.\n    * Intelligent scheduler based on the SuperMemo SM2 algorithm.\n    * Flexible fact/card model that allows you to generate multiple views of information, and input information in the format you wish. You're not limited to predefined styles.\n    * Audio and images are fully supported\n    * Fully extensible, with a large number of plugins already available\n    * Optimized for speed, and will handle reviewing decks of 100,000+ cards with no problems\n    * Clean, user-friendly interface\n    * Free and Open Source\n\nHomepage: http://ichi2.net/anki/\nLicense: GPL"
 S'/home/user/MyDocs/ankimaemi/ankimaemi-src/'
 S'/home/user/MyDocs/ankimaemi/ankimaemi.png'
-S'#!/bin/sh\nif [ ! -f  /home/user/.ankimini-config.py ]; then\ncat > /home/user/.ankimini-config.py <<EOF\nSERVER_PORT = 8000\nDECK_PATH = os.path.join("/home/user/MyDocs", "mydeck.anki")\nSYNC_USERNAME = "syncuser"\nSYNC_PASSWORD = "sync"\nEOF\nfi\n'
+S''
 S''
 S''
 S''
