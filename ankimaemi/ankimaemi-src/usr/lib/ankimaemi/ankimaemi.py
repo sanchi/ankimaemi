@@ -8,7 +8,7 @@
 # License: GPLv3
 
 appname = "ankimaemi"
-appversion = "0.0.3"
+appversion = "0.0.4"
 
 import os
 os.environ["SDL_VIDEO_X11_WMCLASS"]=appname
@@ -44,6 +44,9 @@ class AnkiMiniApp(hildon.Program):
     DECK_PATH = ""
     SYNC_USERNAME = ""
     SYNC_PASSWORD = ""
+
+    recent_decks = []
+    recent_sub_menu = None
 
     def __init__(self):
         hildon.Program.__init__(self)
@@ -163,6 +166,11 @@ class AnkiMiniApp(hildon.Program):
         menu_item.connect("activate", self.choose_deck, "choose_deck")
         menu_item.show()
 
+        menuItemRecent = gtk.MenuItem("Recent Decks")
+        self.recent_sub_menu = gtk.Menu()
+        menuItemRecent.set_submenu(self.recent_sub_menu)
+        self.recent_sub_menu.show()
+
         menuItemSave = gtk.MenuItem("Save")
         menuItemSave.connect("activate", self.opbutclick, "save")
 
@@ -182,6 +190,7 @@ class AnkiMiniApp(hildon.Program):
         menuItemExit.connect("activate", self.quit_save, "quit")
 
         self.menu.append(menu_item)
+        self.menu.append(menuItemRecent)
         self.menu.append(menuItemSave)
         self.menu.append(menuItemSync)
         self.menu.append(menuItemClose)
@@ -190,13 +199,40 @@ class AnkiMiniApp(hildon.Program):
         self.menu.append(menuItemSeparator1)
         self.menu.append(menuItemExit)
         self.window.set_menu(self.menu)
-
+    
     def set_window_empty(self):
         self.opbuttonsbox.hide()
         self.answerbuttonbox.hide()
         self.resultbuttonbox.hide()
 
-        
+    def update_recent_menu(self, new_deckname):
+        if new_deckname == "":
+            return
+
+        if self.recent_decks.count(new_deckname) > 0:
+            self.recent_decks.remove(new_deckname)
+        self.recent_decks = [new_deckname] + self.recent_decks
+        self.recent_decks = self.recent_decks[0:5]
+
+        self.set_recent_menu()
+
+    def set_recent_menu(self):
+        for i in range(5):
+            if len(self.recent_decks) > i:
+                self.conf_client.set_string("/apps/anki/general/deck_path_history%d"%i, self.recent_decks[i])
+
+        for child in self.recent_sub_menu.get_children():
+            self.recent_sub_menu.remove(child)
+
+        for deckname in self.recent_decks:
+            menu_item_recent = gtk.MenuItem(deckname)
+            menu_item_recent.connect("activate", self.recentclick, deckname)
+            menu_item_recent.show()
+            self.recent_sub_menu.add(menu_item_recent)
+
+#        for f in range(5):
+#            self.recent_decks[f].get_children()[0].set_markup(self.recent_decks_files[f])
+       
     def init_deck(self):
         print "open deck.. " + self.DECK_PATH
         if not os.path.exists(self.DECK_PATH):
@@ -213,6 +249,10 @@ class AnkiMiniApp(hildon.Program):
     def yesno_dlg(self, dtype, msg):
         dlg = gtk.MessageDialog(None,0, dtype, gtk.BUTTONS_YES_NO, msg)
         rep = dlg.run()
+        dlg.destroy()
+        while (gtk.events_pending()):
+             gtk.main_iteration()
+
         return rep == gtk.RESPONSE_YES
 
     def choose_deck(self, widget, event):
@@ -220,18 +260,14 @@ class AnkiMiniApp(hildon.Program):
             if self.deck.modifiedSinceSave() and self.yesno_dlg(gtk.MESSAGE_QUESTION, "Save the current deck first?"):
                 self.deck_save()                
 
-            self.deck.close()
         selector=hildon.FileChooserDialog(self.window,gtk.FILE_CHOOSER_ACTION_OPEN)
         rep=selector.run()
         selector.hide()
         a=selector.get_filename()
-        if rep==gtk.RESPONSE_OK:
-            self.DECK_PATH = a
-            if (self.init_deck()):
-                self.set_question()
-                self.set_stats()
-                self.conf_client.set_string("/apps/anki/general/deck_path", self.DECK_PATH)
         selector.destroy()
+        if rep==gtk.RESPONSE_OK:
+            self.replace_deck_with_file(a)
+
 
     def run(self):
         self.window.show_all()
@@ -241,6 +277,12 @@ class AnkiMiniApp(hildon.Program):
         self.DECK_PATH = self.conf_client.get_string("/apps/anki/general/deck_path")
         self.SYNC_USERNAME = self.conf_client.get_string("/apps/anki/general/sync_username")
         self.SYNC_PASSWORD = self.conf_client.get_string("/apps/anki/general/sync_password")
+
+        for i in range(5):
+            h = self.conf_client.get_string("/apps/anki/general/deck_path_history%d"%i)
+            if h:
+                self.recent_decks.append(h)
+        self.set_recent_menu()
 
         if not self.DECK_PATH or self.DECK_PATH == "": 
             self.set_window_empty()
@@ -327,6 +369,8 @@ body { margin-top: 0px; padding: 0px; }
         else:
             self.currentCard = c
             self.answerbuttonbox.show()
+            #self.answerbutton.grab_focus()
+
             self.resultbuttonbox.hide()
             self.set_html_doc('<br/><br/><center><div class="q"> %s </div></center>' % 
                               self.prepareMedia(c.question).encode("utf-8"))
@@ -349,6 +393,7 @@ body { margin-top: 0px; padding: 0px; }
         self.opbuttonsbox.show()
         self.answerbuttonbox.hide()
         self.resultbuttonbox.show()
+        #self.resbuttons[2].grab_focus()
         self.set_html_doc('<br/><br/><center><div class="q">%s</div> <br/><br/><div class="a"> %s </div></center>' % 
                           (self.prepareMedia(c.question, auto=False).encode("utf-8"), self.prepareMedia(c.answer).encode("utf-8")))
         for i in range(2, 5):
@@ -444,6 +489,26 @@ Fetching summary from server..<br>
         self.print_html_doc("<center><br/><br/>saving %s...</center>" % self.DECK_PATH)
         self.deck.save()        
 
+    def replace_deck_with_file(self, fname):
+        if self.deck:
+            self.deck.close()
+        self.deck = None
+        self.update_recent_menu(self.DECK_PATH)
+
+        self.DECK_PATH = fname
+        if self.init_deck():
+            self.set_question()
+            self.set_stats()
+            self.conf_client.set_string("/apps/anki/general/deck_path", self.DECK_PATH)
+        else:
+            self.DECK_PATH = ""   
+
+    def recentclick(self, widget, cmd):
+        self.replace_deck_with_file(cmd)
+        
+#        self.err_dlg("Open recent: %s" % cmd)
+
+        
     def opbutclick(self, widget, cmd):
         if cmd == 'save':
             if self.deck:
@@ -454,11 +519,17 @@ Fetching summary from server..<br>
             self.set_q_a()
             self.set_stats()
         elif cmd == 'close':
+            if not self.deck:
+                return
+            
             if self.deck.modifiedSinceSave() and \
                     self.yesno_dlg(gtk.MESSAGE_QUESTION, "Save the current deck first?"):
                 self.deck_save()                
             self.deck.close()
             self.deck = None
+            self.update_recent_menu(self.DECK_PATH)
+            self.DECK_PATH = ""
+            self.conf_client.set_string("/apps/anki/general/deck_path", self.DECK_PATH)
             self.opbuttonsbox.hide()
             self.answerbuttonbox.hide()
             self.resultbuttonbox.hide()
@@ -471,6 +542,9 @@ Fetching summary from server..<br>
             self.prepareMedia(self.currentCard.question)
             self.prepareMedia(self.currentCard.answer)
         elif cmd == 'sync':
+            if not self.deck:
+                return
+
             self.opbuttonsbox.hide()
             self.answerbuttonbox.hide()
             self.resultbuttonbox.hide()
@@ -506,6 +580,7 @@ Fetching summary from server..<br>
 
         if self.deck:
             self.deck.close()
+        self.deck = None
 
         gtk.main_quit()
         
