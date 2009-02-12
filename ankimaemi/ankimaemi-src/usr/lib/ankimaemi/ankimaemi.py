@@ -6,9 +6,11 @@
 # see http://ichi2.net/anki/ and http://anki.garage.maemo.org 
 #
 # License: GPLv3
+#
+# sorry this code is so messy....its just hacked up....
 
 appname = "ankimaemi"
-appversion = "0.0.4"
+appversion = "0.0.5"
 
 import os
 os.environ["SDL_VIDEO_X11_WMCLASS"]=appname
@@ -141,6 +143,20 @@ class AnkiMiniApp(hildon.Program):
         self.answerbutton.show()
         
         self.answerbuttonbox.show()
+
+        self.learnmorebox = gtk.HBox(False, 0)
+        self.learnmorebox.set_size_request(800, 35)
+        self.mainbox.pack_end(self.learnmorebox, False, True, 0)
+
+        self.learnmorebutton = gtk.Button("Learn more")
+        self.learnmorebutton.connect("clicked", self.opbutclick, "learnmore")
+        self.learnmorebox.pack_start(self.learnmorebutton, True, True, 0)
+        self.learnmorebutton.show()
+
+        self.reviewearlybutton = gtk.Button("Review early")
+        self.reviewearlybutton.connect("clicked", self.opbutclick, "reviewearly")
+        self.learnmorebox.pack_start(self.reviewearlybutton, True, True, 0)
+        self.reviewearlybutton.show()
         
         self.resultbuttonbox = gtk.HBox(False, 15)
         self.resultbuttonbox.set_size_request(800, 80)
@@ -218,7 +234,7 @@ class AnkiMiniApp(hildon.Program):
 
     def set_recent_menu(self):
         for i in range(5):
-            if len(self.recent_decks) > i:
+            if len(self.recent_decks) > i and self.recent_decks[i]:
                 self.conf_client.set_string("/apps/anki/general/deck_path_history%d"%i, self.recent_decks[i])
 
         for child in self.recent_sub_menu.get_children():
@@ -265,9 +281,10 @@ class AnkiMiniApp(hildon.Program):
         selector.hide()
         a=selector.get_filename()
         selector.destroy()
+        while (gtk.events_pending()):
+             gtk.main_iteration()
         if rep==gtk.RESPONSE_OK:
             self.replace_deck_with_file(a)
-
 
     def run(self):
         self.window.show_all()
@@ -333,6 +350,8 @@ class AnkiMiniApp(hildon.Program):
         self.document.write_stream("""
 <html><head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="user-scalable=yes, width=device-width,
+    maximum-scale=0.6667" />
 <style>
 .q
 { font-size: 30px; color:#0000ff;}
@@ -343,7 +362,7 @@ body { margin-top: 0px; padding: 0px; }
 </head><body>
 %s
 </body></html>
-""" % html_str)
+""" % html_str.replace('font-weight:600','font-weight:bold'))
         self.document.close_stream()
         self.view.set_document(self.document)
 
@@ -365,13 +384,14 @@ body { margin-top: 0px; padding: 0px; }
             if not c:
                 self.answerbuttonbox.hide()
                 self.resultbuttonbox.hide()
+                self.learnmorebox.show()
                 self.set_html_doc(self.deck.deckFinishedMsg())
         else:
             self.currentCard = c
             self.answerbuttonbox.show()
             #self.answerbutton.grab_focus()
-
             self.resultbuttonbox.hide()
+            self.learnmorebox.hide()
             self.set_html_doc('<br/><br/><center><div class="q"> %s </div></center>' % 
                               self.prepareMedia(c.question).encode("utf-8"))
 
@@ -393,6 +413,7 @@ body { margin-top: 0px; padding: 0px; }
         self.opbuttonsbox.show()
         self.answerbuttonbox.hide()
         self.resultbuttonbox.show()
+        self.learnmorebox.hide()
         #self.resbuttons[2].grab_focus()
         self.set_html_doc('<br/><br/><center><div class="q">%s</div> <br/><br/><div class="a"> %s </div></center>' % 
                           (self.prepareMedia(c.question, auto=False).encode("utf-8"), self.prepareMedia(c.answer).encode("utf-8")))
@@ -406,9 +427,12 @@ body { margin-top: 0px; padding: 0px; }
     def prepareMedia(self, string, auto=True):
         for (fullMatch, filename, replacementString) in mediaRefs(string):
             if fullMatch.startswith("["):
-                if (filename.lower().endswith(".mp3") or filename.lower().endswith(".wav")) and auto:
-                    subprocess.Popen(["mplayer",
-                                      os.path.join(self.deck.mediaDir(), filename)])
+                try:
+                    if (filename.lower().endswith(".mp3") or filename.lower().endswith(".wav")) and auto:
+                        subprocess.Popen(["mplayer",
+                                          os.path.join(self.deck.mediaDir(), filename)])
+                except:
+                    pass
                 string = re.sub(re.escape(fullMatch), "", string)
             else:
                 pass
@@ -504,6 +528,9 @@ Fetching summary from server..<br>
             self.DECK_PATH = ""   
 
     def recentclick(self, widget, cmd):
+        if self.deck and self.deck.modifiedSinceSave() and self.yesno_dlg(gtk.MESSAGE_QUESTION, "Save the current deck first?"):
+            self.deck_save()                
+
         self.replace_deck_with_file(cmd)
         
 #        self.err_dlg("Open recent: %s" % cmd)
@@ -563,6 +590,25 @@ Fetching summary from server..<br>
                 self.markbuttonlabel.set_markup('<span color="red">mark</span>')
             else:
                 self.markbuttonlabel.set_markup('mark')
+        elif cmd == 'learnmore':
+            self.deck.extraNewCards += 5
+
+            self.deck.refresh()
+            self.deck.updateAllPriorities()
+            self.deck.rebuildCounts()
+            self.deck.rebuildQueue()
+            self.set_question()
+            self.set_stats()
+
+        elif cmd == 'reviewearly':
+            self.deck.reviewEarly = True
+            self.deck.refresh()
+            self.deck.updateAllPriorities()
+            self.deck.rebuildCounts()
+            self.deck.rebuildQueue()
+            self.set_question()
+            self.set_stats()
+
 
                               
     def resclick(self, widget, number):
