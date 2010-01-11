@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0.0
+Encoding=UTF-8
+Name=ankiqt
+Comment=ankiqt for maemo
+Exec=/usr/bin/anki
+Icon=ankiqt
+X-Icon-path=/usr/share/icons
+X-Window-Icon=ankiqt
+Type=Application
+X-Osso-Service=com.nokia.ankiqt
+X-Osso-Type=application/x-executable
+StartupWMClass=ankiqt

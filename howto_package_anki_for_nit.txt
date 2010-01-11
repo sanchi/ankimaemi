@@ -1,0 +1,157 @@
+how to package new anki version for the NIT
+-------------------------------------------
+
+for packaging this, py2deb is needed. also, this package build directory from github is needed.
+
+if this directory is placed elsewhere than MyDocs, then the location of anki.png in 
+the build script needs to be adapted.
+
+we get the new source, create tar.gz package with distutils bdist_dumb, 
+and use that tar dist for input to the py2deb, which adds the debian 
+build script to it, and creates .changes and .dsc. 
+
+this is for 9.9.8.5 - substitute with appropriate version of course. 
+
+
+directory structure
+---------------------
+in the beginning we have the following dir structure:
+
+MyDocs/ 
+      anki.png
+      py2deb/
+             anki/
+                  anki/
+                       build_anki.py
+                       src/                           
+                  ankiqt/
+                       build_ankiqt.py
+                       src/usr/share/
+                                    applications/...
+                                    d-bus1/...
+                                    icons/...
+                                    pixmaps/...
+                  ankimaemi/
+                            build_ankimaemi.py
+                            src/usr/bin/
+                                        ankimaemi
+                            src/usr/lib/ankimaemi/
+                                                  ankimaemi.py
+                            src/usr/share/
+                                         applications/...
+                                         dbus-1/...
+                                         icons/...
+                                         pixmaps/...
+and with the new anki, we get
+
+MyDocs/ 
+      anki.png
+      py2deb/
+             anki/
+                  anki/
+                       build_anki.py
+                       src/                           
+*                         usr/lib/python2.5/site-packages/anki/                                                              ...
+*                         usr/lib/python2.5/site-packages/anki-0.9.9.8.5-py2.5.egg.info/                                                              ...
+                  ankiqt/
+                       build_ankiqt.py
+                       src/
+                          usr/share/
+                                    applications/...
+                                    d-bus1/...
+                                    icons/...
+                                    pixmaps/...
+*                         usr/bin/anki                          
+*                         usr/lib/python2.5/site-packages/ankiqt/...
+                  ankimaemi/
+                            build_ankimaemi.py
+                            src/usr/bin/
+                                        ankimaemi
+                            src/usr/lib/ankimaemi/
+                                                  ankimaemi.py
+                            src/usr/share/
+                                         applications/...
+                                         dbus-1/...
+                                         icons/...
+                                         pixmaps/...
+
+
+libanki: this is packaged as package anki on NIT
+------------------------------------------------
+get and unpack new source:
+
+~/MyDocs/py2deb/ $ wget http://anki.googlecode.com/files/anki-0.9.9.8.5.tgz
+~/MyDocs/py2deb/ $ tar xzvf anki-0.9.9.8.5.tgz
+~/MyDocs/py2deb/ $ cd anki-0.9.9.8.5/libanki
+make tar ball dist package with distutils:
+
+~/MyDocs/py2deb/anki-0.9.9.8.5/libanki $ python setup.py bdist_dumb
+use that for py2deb:
+~/MyDocs/py2deb/anki-0.9.9.8.5/libanki $ cd ../../anki/anki/src
+~/MyDocs/py2deb/anki/anki/src $ tar xzvf ../../../anki-0.9.9.8.5/libanki/dist/anki-0.9.9.8.5.linux-armv6l.tar.gz
+~/MyDocs/py2deb/anki/anki/src $ cd ..
+~/MyDocs/py2deb/anki/anki $ vi build_anki.py 
+... edit version etc ...
+
+~/MyDocs/py2deb/anki/anki $ python build_anki.py 
+... need to press enter two times on the N800 display of you don't have signing keys...
+
+if py2deb doesn't like the "user/education" category, i.e. it fails with 
+
+----
+Traceback (most recent call last):
+  File "build_ankimaemi.py", line 85, in <module>
+    r = p.generate(version,build,changelog=changeloginformation,tar=True,dsc=True,changes=True,build=False,src=True)
+  File "/usr/lib/python2.5/site-packages/py2deb.py", line 245, in generate
+    raise Py2debException("section '%s' is unknown (%s)" % (section,str(Py2deb.SECTIONS)))
+py2deb.Py2debException: section 'user/education' is unknown (['user/accessories', 'user/communication', 'user/games', 'user/multimedia', 'user/office', 'user/other', 'user/programming', 'user/support', 'user/themes', 'user/tools', 'accessories', 'communication', 'games', 'multimedia', 'office', 'other', 'programming', 'support', 'themes', 'tools'])
+---
+
+add user/education to /usr/lib/python2.5/site-packages/py2deb.py line 73
+
+when it runs fine, then there should be .tar.gz, .dsc, and .changes file.
+copy them over to desktop pc, or sshfs mount the dir on the NIT. then proceed with 
+extras-assistant:
+ https://garage.maemo.org/extras-assistant/index.php?step=2
+
+ankimaemi
+---------
+cd py2deb/ankimaemi
+vi build_ankimaemi.py
+... edit version ...
+
+edit or get ankimaemi source into
+ src/usr/lib/ankimaemi/ankimaemi.py
+run
+python build_ankimaemi.py
+
+and proceed with extras-assistant as above.
+
+
+ankiqt
+------
+compile ankiqt:
+/MyDocs/py2deb/anki-0.9.9.8.5 $ python setup.py bdist_dumb
+... creates py2deb/anki-0.9.9.8.5/dist/ankiqt-0.9.9.8.5.linux-armv6l.tar.gz ...
+
+extract to build folder:
+
+~/MyDocs/py2deb $ cd anki/ankiqt/src/
+~/MyDocs/py2deb/anki/ankiqt/src $ tar xzvf ../../../anki-0.9.9.8.5/dist/ankiqt-0.9.9.8.5.linux-armv6l.tar.gz
+
+
+we need to replace the original anki executable by a wrapper that redirects to stdout:
+
+~/MyDocs/py2deb/anki/ankiqt/src/usr $ mkdir -p lib/ankiqt
+~/MyDocs/py2deb/anki/ankiqt/src/usr $ mv bin/anki lib/ankiqt/anki
+~/MyDocs/py2deb/anki/ankiqt/src/usr $ mv ../..//anki bin/anki
+
+the /usr/bin/anki binary is just this little script:
+---
+#!/bin/sh
+
+# service may not print anything to stdout/stderr
+exec /usr/lib/ankiqt/anki 2>&1 >/dev/null
+----
+
+

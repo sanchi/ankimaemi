@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0.0
+Encoding=UTF-8
+Name=ankimaemi
+Comment=anki for maemo
+Exec=/usr/bin/ankimaemi
+Icon=ankimaemi
+X-Icon-path=/usr/share/icons
+X-Window-Icon=ankimaemi
+Type=Application
+X-Osso-Service=com.nokia.ankimaemi
+X-Osso-Type=application/x-executable
+StartupWMClass=ankimaemi
