@@ -147,11 +147,32 @@ we need to replace the original anki executable by a wrapper that redirects to s
 ~/MyDocs/py2deb/anki/ankiqt/src/usr $ mv ../..//anki bin/anki
 
 the /usr/bin/anki binary is just this little script:
----
+---~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~---
 #!/bin/sh
 
 # service may not print anything to stdout/stderr
 exec /usr/lib/ankiqt/anki 2>&1 >/dev/null
-----
+---~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~---
+
+and we need to add a little piece of code to lib/ankiqt/anki so that the ankiqt program
+does not get killed by hildon if it is executed from the menu:
+
+~/MyDocs/py2deb/anki/ankiqt/src/usr $ vi lib/ankiqt/anki
+---~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~---
+#!/usr/bin/python
+appname = "ankiqt"
+appversion = "0.9.9.8.5"
+
+import os
+os.environ["SDL_VIDEO_X11_WMCLASS"]=appname
+import osso
+
+osso_c = osso.Context(appname, appversion, False)
+
+import os, sys
+
+if __name__ == "__main__":
+...
+---~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~---
 
 
