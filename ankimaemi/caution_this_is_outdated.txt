@@ -1,0 +1,1 @@
+the current (0.0.8) version is in package
