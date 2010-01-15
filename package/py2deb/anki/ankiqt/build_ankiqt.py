@@ -57,7 +57,7 @@ if __name__ == "__main__":
      p.url="http://ichi2.net/anki"
      p.author="Stefan Sayer"
      p.mail="sayer@cs.tu-berlin.de"
-     p.depends = "anki (= 0.9.9.8.5-1), python2.5-qt4-svg, python2.5-qt4-gui, python2.5-qt4-network, python2.5-qt4-webkit, python2.5-qt4-dev"
+     p.depends = "anki (= 0.9.9.8.5-2), python2.5-qt4-svg, python2.5-qt4-gui, python2.5-qt4-network, python2.5-qt4-webkit, python2.5-osso, python2.5-qt4-dev"
 # todo: python2.5-qt4-dev is only there because of pyqtconfig - in newer upstream this should be moved to python2.5-qt4
 # so check whethere this dependency can be removed
 
@@ -69,7 +69,7 @@ if __name__ == "__main__":
      p.distribution="diablo"
      p.repository="extras-devel"
      version = "0.9.9.8.5"           #Version of your software, e.g. "1.2.0" or "0.8.2"
-     build = "1"                 #Build number, e.g. "1" for the first build of this version of your software. Increment for later re-builds of the same version of your software.
+     build = "3"                 #Build number, e.g. "1" for the first build of this version of your software. Increment for later re-builds of the same version of your software.
                                  #Text with changelog information to be displayed in the package "Details" tab of the Maemo Application Manager
      changeloginformation = "included icons_rc" 
     

@@ -50,7 +50,7 @@ if __name__ == "__main__":
      "Homepage: http://ichi2.net/anki"
      p.author="Stefan Sayer"
      p.mail="sayer@cs.tu-berlin.de"
-     p.depends = "python2.5, python-sqlalchemy (<< 0.5.0), python-simplejson (>= 2.0.6)"
+     p.depends = "python2.5, python-sqlalchemy (<< 0.5.0), python-simplejson (>= 2.0.6), python2.5-xml"
      p.build_depends = "less"
      p.section="other"
 #     p.icon = "/home/user/MyDocs/mclock/mClock.png"
@@ -59,7 +59,7 @@ if __name__ == "__main__":
      p.distribution="diablo"
      p.repository="extras-devel"
      version = "0.9.9.8.5"           #Version of your software, e.g. "1.2.0" or "0.8.2"
-     build = "1"                 #Build number, e.g. "1" for the first build of this version of your software. Increment for later re-builds of the same version of your software.
+     build = "2"                 #Build number, e.g. "1" for the first build of this version of your software. Increment for later re-builds of the same version of your software.
                                  #Text with changelog information to be displayed in the package "Details" tab of the Maemo Application Manager
      changeloginformation = "many many improvements. see http://ichi2.net/anki/download/index.html"
     

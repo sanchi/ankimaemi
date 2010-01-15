@@ -58,7 +58,7 @@ if __name__ == "__main__":
      p.url="http://ichi2.net/anki"
      p.author="Stefan Sayer"
      p.mail="sayer@cs.tu-berlin.de"
-     p.depends = "anki (>= 0.9.9.7.9-1), python-gtkhtml2"
+     p.depends = "anki (>= 0.9.9.7.9-1), python-gtkhtml2, python2.5-osso, python2.5-hildon, python2.5-gnome"
      p.build_depends="debhelper (>= 5)"
      p.section="user/education"
      p.icon = "/home/user/MyDocs/anki.png"
@@ -67,7 +67,7 @@ if __name__ == "__main__":
      p.distribution="diablo"
      p.repository="extras-devel"
      version = "0.0.8"           #Version of your software, e.g. "1.2.0" or "0.8.2"
-     build = "2"                 #Build number, e.g. "1" for the first build of this version of your software. Increment for later re-builds of the same version of your software.
+     build = "3"                 #Build number, e.g. "1" for the first build of this version of your software. Increment for later re-builds of the same version of your software.
                                  #Text with changelog information to be displayed in the package "Details" tab of the Maemo Application Manager
      changeloginformation = "* support for zoom keys\n* using Deja-Vu Sans font for more unicode charactes, sans-serif as backup (patch by Robert Thomson)" 
     
